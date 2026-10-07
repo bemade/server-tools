@@ -63,6 +63,7 @@ def _extend_name_results(self, domain, results, limit):
         rec_ids = self._search(
             domain,
             limit=limit - result_count,
+            order=self._order,
         )
         results.extend(rec_ids)
     return results
