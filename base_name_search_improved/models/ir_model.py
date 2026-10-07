@@ -68,6 +68,22 @@ def _extend_name_results(self, domain, results, limit):
     return results
 
 
+def _smart_name_search_applies(self, name, operator):
+    """Smart search widens fuzzy searches only, and can be switched off.
+
+    Exact operators (``=``, ``=ilike``...) keep Odoo's own matching: that is
+    how import resolves a related record by name, and a value that is one
+    record's name and another's phone or city must not resolve to the latter.
+    ``name_search_extended=False`` in the context turns it off for a call.
+    """
+    return (
+        name
+        and isinstance(name, str)
+        and operator in ALLOWED_OPS
+        and self.env.context.get("name_search_extended", True)
+    )
+
+
 class Base(models.AbstractModel):
     _inherit = "base"
 
@@ -96,13 +112,9 @@ class Base(models.AbstractModel):
 
     @api.model
     def name_search(self, name="", domain=None, operator="ilike", limit=100):
-        if (
-            not name
-            or not isinstance(name, str)
-            or not (
-                self.env.context.get("force_smart_name_search", False)
-                or _get_use_smart_name_search(self.sudo())
-            )
+        if not _smart_name_search_applies(self, name, operator) or not (
+            self.env.context.get("force_smart_name_search", False)
+            or _get_use_smart_name_search(self.sudo())
         ):
             return super().name_search(name, domain, operator, limit)
 
@@ -240,10 +252,8 @@ class IrModel(models.Model):
                     limit=limit,
                     **kwargs,
                 )
-                if (
-                    not name
-                    or not isinstance(name, str)
-                    or (limit and len(original_results) >= limit)
+                if not _smart_name_search_applies(self, name, operator) or (
+                    limit and len(original_results) >= limit
                 ):
                     return original_results
                 seen_ids = {res[0] for res in original_results}
